@@ -4,7 +4,7 @@ from irods.column import Criterion
 from irods.exception import (CollectionDoesNotExist, OperationNotSupported,
                              MultipleResultsFound)
 from irods.keywords import FORCE_FLAG_KW
-from irods.meta import iRODSMeta
+from irods.meta import iRODSMeta, AVUOperation
 from irods.models import Collection, DataObject
 from vsc_irods.manager import Manager
 
@@ -440,30 +440,27 @@ class BulkManager(Manager):
             raise OperationNotSupported('Unknown action "%s"' % action)
 
         if action == 'add':
-            log_msg = 'Adding metadata {avu} to {kind} {path}'
+            log_msg = 'Adding metadata {avu} to {kind} {path} and btw this is the right version'
         else:
-            log_msg = 'Removing metadata {avu} from {kind} {path}'
+            log_msg = 'Removing metadata {avu} from {kind} {path} and btw this is the right version'
 
         if isinstance(object_avu, tuple): object_avu = [object_avu]
         if isinstance(collection_avu, tuple): collection_avu = [collection_avu]
-
+        print(f"Collection avu: {collection_avu}")
+        print(f"Dataobject avu: {object_avu}")
         for item in iterator:
             path = self.session.path.get_absolute_irods_path(item)
-
+            
             if self.session.collections.exists(path):
                 # Item is a collection, not an object
                 kind = 'collection'
 
                 if recurse:
-                    for avu in collection_avu:
-                        self.log(log_msg.format(avu=avu, kind=kind, path=path),
-                                 verbose)
-
-                        meta = iRODSMeta(*avu)
-                        if action == 'add':
-                            self.session.metadata.set(Collection, path, meta)
-                        elif action == 'remove':
-                            self.session.metadata.remove(Collection, path, meta)
+                    coll=self.session.collections.get(path)
+                    if action == 'add':
+                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(coll_avu[0], coll_avu[1])) for coll_avu in collection_avu])
+                    elif action == 'remove':
+                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(coll_avu[0], coll_avu[1])) for coll_avu in collection_avu])
 
                     self.metadata(item + '/*', action, recurse=True,
                                   collection_avu=collection_avu,
@@ -474,16 +471,12 @@ class BulkManager(Manager):
                              verbose)
             else:
                 kind = 'data object'
+                dataobj = self.session.data_objects.get(path)
+                if action == 'add':
+                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(obj_avu[0], obj_avu[1])) for obj_avu in object_avu])
+                elif action == 'remove':
+                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(obj_avu[0], obj_avu[1])) for obj_avu in object_avu])
 
-                for avu in object_avu:
-                    self.log(log_msg.format(avu=str(avu), kind=kind, path=path),
-                             verbose)
-
-                    meta = iRODSMeta(*avu)
-                    if action == 'add':
-                        self.session.metadata.set(DataObject, path, meta)
-                    elif action == 'remove':
-                        self.session.metadata.remove(DataObject, path, meta)
 
     def add_job_metadata(self, iterator, recurse=False, verbose=False):
         """ Add job-related metadata to selected data objects and collections.
