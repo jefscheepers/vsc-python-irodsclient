@@ -458,9 +458,14 @@ class BulkManager(Manager):
                 if recurse:
                     coll=self.session.collections.get(path)
                     if action == 'add':
-                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(coll_avu[0], coll_avu[1])) for coll_avu in collection_avu])
+                        # Using the for '*coll_avu' so it doesn't matter whether user specifies units or not
+                        # Filtering out avu's with more than 3 arguments 
+                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(*coll_avu)) for coll_avu in collection_avu if len(coll_avu) <= 3])
+                        
+
+
                     elif action == 'remove':
-                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(coll_avu[0], coll_avu[1])) for coll_avu in collection_avu])
+                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(*coll_avu)) for coll_avu in collection_avu if len(coll_avu) <= 3])
 
                     self.metadata(item + '/*', action, recurse=True,
                                   collection_avu=collection_avu,
@@ -473,9 +478,9 @@ class BulkManager(Manager):
                 kind = 'data object'
                 dataobj = self.session.data_objects.get(path)
                 if action == 'add':
-                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(obj_avu[0], obj_avu[1])) for obj_avu in object_avu])
+                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(*obj_avu)) for obj_avu in object_avu if len(obj_avu) <= 3])
                 elif action == 'remove':
-                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(obj_avu[0], obj_avu[1])) for obj_avu in object_avu])
+                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(*obj_avu)) for obj_avu in object_avu if len(obj_avu) <= 3 ])
 
 
     def add_job_metadata(self, iterator, recurse=False, verbose=False):
