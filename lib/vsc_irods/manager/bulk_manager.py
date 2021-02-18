@@ -440,14 +440,12 @@ class BulkManager(Manager):
             raise OperationNotSupported('Unknown action "%s"' % action)
 
         if action == 'add':
-            log_msg = 'Adding metadata {avu} to {kind} {path} and btw this is the right version'
+            log_msg = 'Adding metadata {avu} to {kind} {path}'
         else:
-            log_msg = 'Removing metadata {avu} from {kind} {path} and btw this is the right version'
+            log_msg = 'Removing metadata {avu} from {kind} {path}'
 
         if isinstance(object_avu, tuple): object_avu = [object_avu]
         if isinstance(collection_avu, tuple): collection_avu = [collection_avu]
-        print(f"Collection avu: {collection_avu}")
-        print(f"Dataobject avu: {object_avu}")
         for item in iterator:
             path = self.session.path.get_absolute_irods_path(item)
             
@@ -460,6 +458,8 @@ class BulkManager(Manager):
                     if action == 'add':
                         # Using the for '*coll_avu' so it doesn't matter whether user specifies units or not
                         # Filtering out avu's with more than 3 arguments 
+                        # Note: remove + add = set
+                        coll.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(*coll_avu)) for coll_avu in collection_avu if len(coll_avu) <= 3])
                         coll.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(*coll_avu)) for coll_avu in collection_avu if len(coll_avu) <= 3])
                         
 
@@ -478,6 +478,7 @@ class BulkManager(Manager):
                 kind = 'data object'
                 dataobj = self.session.data_objects.get(path)
                 if action == 'add':
+                    dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(*obj_avu)) for obj_avu in object_avu if len(obj_avu) <= 3 ])
                     dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='add', avu=iRODSMeta(*obj_avu)) for obj_avu in object_avu if len(obj_avu) <= 3])
                 elif action == 'remove':
                     dataobj.metadata.apply_atomic_operations(*[AVUOperation(operation='remove', avu=iRODSMeta(*obj_avu)) for obj_avu in object_avu if len(obj_avu) <= 3 ])
